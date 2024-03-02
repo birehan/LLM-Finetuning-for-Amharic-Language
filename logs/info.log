@@ -1,0 +1,15 @@
+2024-03-11 10:57:53,050:logger:ChromaDB vectorstore created successfully.
+2024-03-11 10:57:53,065:logger:An unexpected error occurred: not enough values to unpack (expected 2, got 0)
+2024-03-11 10:57:53,082:logger:An unexpected error occurred: 1 validation error for ConversationalRetrievalChain
+retriever
+  none is not an allowed value (type=type_error.none.not_allowed)
+2024-03-11 11:02:48,393:logger:ChromaDB vectorstore created successfully.
+2024-03-11 11:02:48,418:logger:An unexpected error occurred: not enough values to unpack (expected 2, got 0)
+2024-03-11 11:02:48,474:logger:An unexpected error occurred: 1 validation error for ConversationalRetrievalChain
+retriever
+  none is not an allowed value (type=type_error.none.not_allowed)
+2024-03-11 11:04:12,892:logger:ChromaDB vectorstore created successfully.
+2024-03-11 11:04:12,914:logger:An unexpected error occurred: not enough values to unpack (expected 2, got 0)
+2024-03-11 11:04:12,933:logger:An unexpected error occurred: 1 validation error for ConversationalRetrievalChain
+retriever
+  none is not an allowed value (type=type_error.none.not_allowed)

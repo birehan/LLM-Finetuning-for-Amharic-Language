@@ -1,71 +1,77 @@
-import pandas as pd
-import psycopg2
-from dotenv import load_dotenv
-import os
 
-# Load environment variables from .env file
-load_dotenv()
+from langchain_community.embeddings import OpenAIEmbeddings
+import weaviate
+from weaviate.embedded import EmbeddedOptions
+from langchain_community.vectorstores import Weaviate
+from langchain_openai import ChatOpenAI
+from langchain.chains import ConversationalRetrievalChain
+from langchain.prompts import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    SystemMessagePromptTemplate,
+)
+from langchain.memory import ( ConversationBufferWindowMemory)
+from dotenv import load_dotenv,find_dotenv
+load_dotenv(find_dotenv())
 
-# Access the values using os.environ.get()
-connection_params = {
-    "user": os.environ.get("DB_USER"),
-    "password": os.environ.get("DB_PASSWORD"),
-    "database": os.environ.get("DB_NAME"),
-    "host": os.environ.get("DB_HOST"),
-    "port": os.environ.get("DB_PORT")
-}
+import requests
 
+def translate_text(text, from_lang, to_lang):
+    url = "https://translate.googleapis.com/translate_a/single"
+    headers = {
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Language": "en-US,en;q=0.9,fr;q=0.8",
+        "Content-Type": "application/json; charset=utf-8",
+        "Origin": "https://www.easyamharictyping.com",
+        "Referer": "https://www.easyamharictyping.com/",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "cross-site",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    }
 
-def get_postgres_data(query: str) -> tuple:
-    """
-    Execute a SQL query on a PostgreSQL database and return the results and cursor description.
-
-    Parameters:
-        query (str): SQL query to be executed.
-
-    Returns:
-        tuple: A tuple containing the results and cursor description.
-
-    Raises:
-        Exception: If there is an error during the execution or fetching of data.
-    """
-    conn = psycopg2.connect(**connection_params)
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute(query)
-        results = cursor.fetchall()
-        description = cursor.description
-        return results, description
-
-    except Exception as e:
-        error_message = f"Error executing query or fetching data from the database: {e}"
-        raise Exception(error_message)
-
-    finally:
-        cursor.close()
-        conn.close()
+    params = {
+        "client": "gtx",
+        "sl": from_lang,
+        "tl": to_lang,
+        "dt": "t",
+        "q": text,
+    }
 
 
-def get_postgres_df(query: str) -> pd.DataFrame:
-    """
-    Execute a SQL query on a PostgreSQL database and return the results as a Pandas DataFrame.
+    response = requests.get(url, params=params, headers=headers)
+    answer = response.json()
+    answer = "".join([answer[0][i][0] for i in range(len(answer[0]))])
+    answer
+    return answer
 
-    Parameters:
-        query (str): SQL query to be executed.
 
-    Returns:
-        pd.DataFrame: The results of the query as a Pandas DataFrame.
+def create_rag_pipeline():
+    llm = ChatOpenAI(temperature=0.1, model = 'gpt-3.5-turbo')
+    file_path = "../prompts/system_message.txt"
+    with open(file_path, 'r') as txt_file:
+        template = txt_file.read()
 
-    Raises:
-        Exception: If there is an error during the execution or conversion of query results.
-    """
-    try:
-        results, description = get_postgres_data(query)
-        columns = [desc[0] for desc in description]
-        df = pd.DataFrame(results, columns=columns)
-        return df
+    system_message_prompt = SystemMessagePromptTemplate.from_template(template)
+    human_message_prompt = HumanMessagePromptTemplate.from_template("{question}")
 
-    except Exception as e:
-        error_message = f"Error converting query results to Pandas DataFrame: {e}"
-        raise Exception(error_message)
+    client = weaviate.Client(embedded_options=EmbeddedOptions())
+    vectorstore = Weaviate.from_documents(client=client, documents=[], embedding=OpenAIEmbeddings(), by_text=False)
+    retriever = vectorstore.as_retriever()
+    chat_memory = ConversationBufferWindowMemory(memory_key="chat_history", return_messages=True)
+    conversation_chain = ConversationalRetrievalChain.from_llm(
+    llm=llm,
+    retriever=retriever,
+    memory=chat_memory,
+    combine_docs_chain_kwargs={
+        "prompt": ChatPromptTemplate.from_messages(
+            [
+                system_message_prompt,
+                human_message_prompt,
+            ]
+        ),
+    },
+    )
+    
+    return conversation_chain
